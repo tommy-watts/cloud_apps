@@ -1,0 +1,25 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Refunds Data Upload</title>
+  </head>
+  <body>
+
+    {% if table %}
+
+      <h1>Check uploaded file</h1>
+
+      {{ table | safe}}
+
+      <form method="POST" action="/sending" >
+        <p><input type="submit" name ="submit_button" value="Submit"></p>
+      </form>
+      
+      <form method="POST" action="/" >
+        <p><input type="submit" value="Cancel"></p>
+      </form>
+
+    {% endif %}
+
+  </body>
+</html>

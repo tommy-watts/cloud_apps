@@ -1,0 +1,11 @@
+dash
+dash-core-components
+dash-html-components
+dash-renderer
+gunicorn
+google-api-core
+google-auth
+google-cloud-core
+google-cloud-storage
+pandas
+pygyver
