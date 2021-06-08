@@ -130,3 +130,5 @@ dmypy.json
 
 **/.DS_Store
 **/__pycache__
+
+*access_token.json

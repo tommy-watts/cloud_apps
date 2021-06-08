@@ -6,7 +6,7 @@ import io
 import logging
 from google.cloud import storage
 
-os.environ['GOOGLE_APPLICATION_CREDENTIALS']="/Users/tommy.watts/Documents/access_token.json"
+os.environ['GOOGLE_APPLICATION_CREDENTIALS']="/access_token.json"
 
 app = Flask(__name__)
 
@@ -63,7 +63,7 @@ def preview():
 
                     upload_gcs('madecom-dev-tommy-watts-sandbox', uploaded_file, os.path.basename(uploaded_file))
 
-                    render_template('sending.html')
+                    render_template('sent.html')
 
             except Exception as e:
                 print(e)
@@ -72,9 +72,9 @@ def preview():
     else:
         return render_template('index.html')
 
-@app.route('/sending', methods=['GET', 'POST'])
+@app.route('/sent', methods=['GET', 'POST'])
 def test():
-    return render_template('index.html')
+    return render_template('sent.html')
 
 @app.errorhandler(500)
 def server_error(e):
