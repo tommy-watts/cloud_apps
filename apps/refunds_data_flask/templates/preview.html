@@ -13,11 +13,13 @@
             {% if table %}
               <h1>Check uploaded file</h1>
               {{ table | safe}}
-              <form method="POST" action="/sent" >
+              <form method="POST">
                 <p><input type="submit" name ="submit_button" value="Submit" class="button button-submit"></p>
+                <p><input type="file" name="file" value={{data}}></p>
                 <a href="/" class="button button-cancel">Cancel</a>
               </form>
             {% endif %}
+            {{data}}
           </div>
         </div>
       </div>
