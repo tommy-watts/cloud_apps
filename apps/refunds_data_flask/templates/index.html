@@ -2,14 +2,21 @@
 <html>
   <head>
     <title>Refunds Data Upload</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <link rel="preconnect" href="https://fonts.gstatic.com">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@100&display=swap" rel="stylesheet">
   </head>
   <body>
-
-      <h1>Upload your Refunds data file</h1>
-      <form method="POST" action="preview" enctype="multipart/form-data">
-        <p><input type="file" name="file"></p>
-        <p><input type="submit" value="Submit"></p>
-      </form>
-
+    <div class="container-outer">
+      <div class="container-inner">
+        <div class="upload-form">
+          <h1>Upload your Refunds data file</h1>
+          <form method="POST" action="preview" enctype="multipart/form-data">
+            <p><input type="file" name="file"></p>
+            <p class="form-input"><input type="submit" value="Preview" class="button button-submit"></p>
+          </form>
+      </div>
+      </div>
+    </div>
   </body>
 </html>

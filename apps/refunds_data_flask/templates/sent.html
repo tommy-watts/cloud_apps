@@ -10,14 +10,8 @@
     <div class="container-outer">
         <div class="container-inner">
           <div class="upload-form">
-            {% if table %}
-              <h1>Check uploaded file</h1>
-              {{ table | safe}}
-              <form method="POST" action="/sent" >
-                <p><input type="submit" name ="submit_button" value="Submit" class="button button-submit"></p>
-                <a href="/" class="button button-cancel">Cancel</a>
-              </form>
-            {% endif %}
+            <h1>Your file has been successfully upload!</h1>
+            <a href="/" class="button button-submit">Home</a>
           </div>
         </div>
       </div>
