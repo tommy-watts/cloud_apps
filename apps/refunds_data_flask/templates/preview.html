@@ -14,9 +14,11 @@
               <h1>Check uploaded file</h1>
               {{ table | safe}}
               <form method="POST">
-                <p><input type="submit" name ="submit_button" value="Submit" class="button button-submit"></p>
-                <p><input type="file" name="file" value={{data}}></p>
-                <a href="/" class="button button-cancel">Cancel</a>
+                <p><input type="hidden" name="gcs_filename" value={{gcs_filename}}></p>
+                <div class="form-buttons">
+                  <p><input type="submit" name ="submit_button" value="Submit" class="button button-submit"></p>
+                  <p><a href="/" class="button button-cancel">Cancel</a></p>
+                </div>
               </form>
             {% endif %}
             {{data}}

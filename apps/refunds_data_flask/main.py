@@ -25,16 +25,15 @@ def parse_refunds_data(path):
     return df
 
 
-def upload_gcs(bucket_name, source_file_name, destination_blob_name):
+def upload_gcs(bucket_name, df, destination_blob_name):
     storage_client = storage.Client()
     bucket = storage_client.bucket(bucket_name)
     blob = bucket.blob(destination_blob_name)
-    logging('hererere')
-    blob.upload_from_filename(source_file_name)
+    blob.upload_from_string(df.to_csv(index=index), 'text/csv')
 
     logging.warning(
         "File {} uploaded to {}.".format(
-            source_file_name, destination_blob_name
+            'file', destination_blob_name
         )
     )
     
@@ -63,29 +62,28 @@ def preview():
     if request.method == 'POST':
 
         uploaded_file = request.files.get('file')
+        gcs_filename = request.form.get('gcs_filename')
         timestr = time.strftime("%Y%m%d-%H%M%S")
 
         # if not uploaded_file:
         #     return 'No file uploaded.', 400
-        filename = uploaded_file.filename
-
-        if filename != '':
+        if uploaded_file:
+            filename = uploaded_file.filename
             try:
                 if 'csv' in filename:
                     df = pd.read_csv(uploaded_file)
                 elif 'xls' in filename:
                     df = parse_refunds_data(uploaded_file)
-                gcs_filename =  '/draft' + 'refund_upload_' + timestr
-                upload_gcs('madecom-dev-tommy-watts-sandbox', uploaded_file, '/draft/'+ gcs_filename)
+                gcs_filename =  'upload_' + timestr
+                upload_gcs('madecom-dev-dan-kruse-sandbox', df, 'refund_uploads/draft/'+ gcs_filename)
             except Exception as e:
                 print(e)
+            return render_template('preview.html', table=df.head().to_html(classes='data'), gcs_filename=gcs_filename)
                 
-        elif request.form['gcs_filename']:
-            gcs_filename = request.form['gcs_filename']
-            move_gcs('madecom-dev-tommy-watts-sandbox', '/draft/'+ gcs_filename, '/confirmed/'+ gcs_filename)
-            render_template('sent.html', gcs_filename=gcs_filename)
+        elif gcs_filename:
+            move_gcs('madecom-dev-dan-kruse-sandbox', 'refund_uploads/draft/'+ gcs_filename, 'refund_uploads/confirmed/'+ gcs_filename)
+            return render_template('sent.html')
 
-        return render_template('preview.html', table=df.head().to_html(classes='data'), data=uploaded_file)
 
 @app.route('/sent', methods=['GET', 'POST'])
 def test():
