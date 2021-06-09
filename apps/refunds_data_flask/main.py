@@ -5,8 +5,9 @@ import base64
 import io
 import logging
 from google.cloud import storage
+import time
 
-os.environ['GOOGLE_APPLICATION_CREDENTIALS']="/access_token.json"
+os.environ['GOOGLE_APPLICATION_CREDENTIALS']="access_token.json"
 
 app = Flask(__name__)
 
@@ -24,18 +25,31 @@ def parse_refunds_data(path):
     return df
 
 
-def upload_gcs(bucket_name, source_file_name, destination_blob_name):
+def upload_gcs(bucket_name, df, destination_blob_name):
     storage_client = storage.Client()
     bucket = storage_client.bucket(bucket_name)
     blob = bucket.blob(destination_blob_name)
+    blob.upload_from_string(df.to_csv(index=index), 'text/csv')
 
-    blob.upload_from_filename(source_file_name)
-
-    print(
+    logging.warning(
         "File {} uploaded to {}.".format(
-            source_file_name, destination_blob_name
+            'file', destination_blob_name
         )
     )
+    
+def move_gcs(bucket_name, source_file_name, destination_blob_name):
+    """Renames a blob."""
+    # bucket_name = "your-bucket-name"
+    # blob_name = "your-object-name"
+    # new_name = "new-object-name"
+
+    storage_client = storage.Client()
+    bucket = storage_client.bucket(bucket_name)
+    blob = bucket.blob(source_file_name)
+
+    new_blob = bucket.rename_blob(blob, destination_blob_name)
+
+    logging.warning("Blob {} has been renamed to {}".format(blob.name, new_blob.name))
 
 
 @app.route('/')
@@ -46,31 +60,30 @@ def index():
 @app.route("/preview", methods=['GET', 'POST'])
 def preview():
     if request.method == 'POST':
-        
-        uploaded_file = request.files.get('file')
-        if not uploaded_file:
-            return 'No file uploaded.', 400
 
-        filename = uploaded_file.filename
-        if filename != '':
+        uploaded_file = request.files.get('file')
+        gcs_filename = request.form.get('gcs_filename')
+        timestr = time.strftime("%Y%m%d-%H%M%S")
+
+        # if not uploaded_file:
+        #     return 'No file uploaded.', 400
+        if uploaded_file:
+            filename = uploaded_file.filename
             try:
                 if 'csv' in filename:
                     df = pd.read_csv(uploaded_file)
                 elif 'xls' in filename:
                     df = parse_refunds_data(uploaded_file)
-
-                if request.form.get('submit_button'):
-
-                    upload_gcs('madecom-dev-tommy-watts-sandbox', uploaded_file, os.path.basename(uploaded_file))
-
-                    render_template('sent.html')
-
+                gcs_filename =  'upload_' + timestr
+                upload_gcs('madecom-dev-dan-kruse-sandbox', df, 'refund_uploads/draft/'+ gcs_filename)
             except Exception as e:
                 print(e)
+            return render_template('preview.html', table=df.head().to_html(classes='data'), gcs_filename=gcs_filename)
+                
+        elif gcs_filename:
+            move_gcs('madecom-dev-dan-kruse-sandbox', 'refund_uploads/draft/'+ gcs_filename, 'refund_uploads/confirmed/'+ gcs_filename)
+            return render_template('sent.html')
 
-        return render_template('preview.html', table=df.head().to_html(classes='data'))
-    else:
-        return render_template('index.html')
 
 @app.route('/sent', methods=['GET', 'POST'])
 def test():
