@@ -1,7 +1,16 @@
-
 body{
     font-family: 'Roboto', sans-serif;
 }
+
+.form-buttons{
+    display:flex;
+    flex-direction: row;
+}
+
+.form-buttons > * {
+    padding:10px 20px 10px 20px;  
+}
+
 .button {
     border: none;
     color: white;
@@ -33,6 +42,7 @@ body{
     width:50%;
     display:flex;
     flex-direction: column;
+    text-align: center;
 }
 .upload-form{
     border: solid 1px lightgrey;
