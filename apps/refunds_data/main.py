@@ -1,12 +1,16 @@
 from flask import Flask, request, render_template, redirect, url_for, flash
 import pandas as pd
 import os
-import base64
-import io
+from datetime import datetime
+from pygyver.etl.dw import BigQueryExecutor
 import logging
 from google.cloud import storage
 
 os.environ['GOOGLE_APPLICATION_CREDENTIALS']="access_token.json"
+os.environ['BIGQUERY_PROJECT']="madecom-dev-tommy-watts"
+os.environ['PROJECT_ROOT']="/Users/tommy.watts/repos/cloud_apps/apps/refunds_data/"
+
+logging.getLogger().setLevel(logging.INFO)
 
 app = Flask(__name__)
 
@@ -29,24 +33,38 @@ def upload_gcs(bucket_name, uploaded_file, destination_blob_name):
     bucket = storage_client.bucket(bucket_name)
     blob = bucket.blob(destination_blob_name)
     blob.upload_from_string(
-        uploaded_file.read(),
-        content_type=uploaded_file.content_type
+        uploaded_file,
+        content_type='text/csv'
     )
-    logging.warning("File {} uploaded to {}.".format(uploaded_file.filename, destination_blob_name))
+    logging.info("File uploaded to {}.".format(destination_blob_name))
 
-def delete_blob(bucket_name, blob_name):
+def delete_tmp(bucket_name, path):
     storage_client = storage.Client()
-    bucket = storage_client.bucket(bucket_name)
-    blob = bucket.blob(blob_name)
-    blob.delete()
-    logging.warning("Blob {} deleted.".format(blob_name))
+    for blob in storage_client.list_blobs(bucket_name, prefix=path):
+        blob.delete()
+        logging.info("Blob {} deleted.".format(str(blob)))
 
 def move_blob(bucket_name, source_file_name, destination_blob_name):
     storage_client = storage.Client()
     bucket = storage_client.bucket(bucket_name)
     blob = bucket.blob(source_file_name)
     new_blob = bucket.rename_blob(blob, destination_blob_name)
-    logging.warning("Blob {} has been renamed to {}".format(blob.name, new_blob.name))
+    logging.info("Blob {} has been renamed to {}".format(blob.name, new_blob.name))
+
+def blob_to_bq(gcs_bucket, gcs_path, dataset_id, table_id):
+    bq = BigQueryExecutor()
+    bq.load_gcs(
+        dataset_id = dataset_id, 
+        table_id = table_id, 
+        gcs_path = gcs_path,
+        schema_path = 'schema/refunds_schema.json',
+        gcs_bucket = gcs_bucket
+    )
+    logging.info("File {} written to {}.{}".format(gcs_path, dataset_id, table_id))
+
+def last_month():
+    now = datetime.now()
+    return f"{now.year}{now.month-1 if now.month else 12}"
 
 
 @app.route('/')
@@ -59,32 +77,33 @@ def preview():
     if request.method == 'POST':
         uploaded_file = request.files.get('file')
         filename = request.form.get('filename')
+        month = last_month()
         if uploaded_file:
             filename = uploaded_file.filename
             try:
-                if 'csv' in filename:
-                    df = pd.read_csv(uploaded_file)
-                elif 'xls' in filename:
+                if 'xls' in filename:
                     df = parse_refunds_data(uploaded_file)
             except Exception as e:
                 logging.info(e)
-            upload_gcs('madecom-dev-tommy-watts-sandbox', uploaded_file, f"tmp/{filename}")
+            upload_gcs('madecom-dev-tommy-watts-sandbox', df.to_csv(index=False), f"tmp/refund_payments_{month}.csv")
             return render_template('preview.html', table=df.head().to_html(classes='data'), filename=filename)
         elif filename:
-            logging.warning(f"@@{filename}")
             return redirect(url_for('sent', filename=filename))
 
-@app.route('/sent/<filename>', methods=['GET', 'POST'])
-def sent(filename):
+@app.route('/sent', methods=['GET', 'POST'])
+def sent():
     try:
-        move_blob('madecom-dev-tommy-watts-sandbox', f"tmp/{filename}", filename)
+        month = last_month()
+        filename = f"refund_payments_{month}.csv"
+        move_blob('madecom-dev-tommy-watts-sandbox', f'tmp/{filename}', filename)
+        blob_to_bq('madecom-dev-tommy-watts-sandbox', filename, 'archive', os.path.splitext(filename)[0])
     except Exception as e:
                 print(e)
     return render_template('sent.html')
 
-@app.route('/cancel/', methods=['POST'])
+@app.route('/cancel', methods=['GET', 'POST'])
 def cancel():
-    delete_blob('madecom-dev-tommy-watts-sandbox', 'tmp')
+    delete_tmp('madecom-dev-tommy-watts-sandbox', 'tmp/')
     return render_template('index.html')
 
 @app.errorhandler(500)
