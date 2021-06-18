@@ -132,3 +132,4 @@ dmypy.json
 **/__pycache__
 
 *access_token.json
+*.env

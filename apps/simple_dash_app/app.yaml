@@ -11,7 +11,3 @@ resources:
     disk_size_gb: 10
 
 entrypoint: gunicorn -b 0.0.0.0:8080 main:server
-
-
-
-

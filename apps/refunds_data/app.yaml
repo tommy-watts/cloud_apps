@@ -13,5 +13,3 @@ resources:
 env_variables:
     BIGQUERY_PROJECT: madecom-dev-tommy-watts
     BUCKET: madecom-dev-tommy-watts-sandbox
-
-entrypoint: gunicorn -b 0.0.0.0:8080 main:server

@@ -1,4 +1,4 @@
-from flask import Flask, request, render_template, redirect, url_for, flash
+from flask import Flask, request, render_template, redirect, url_for
 import pandas as pd
 import os
 from datetime import datetime
