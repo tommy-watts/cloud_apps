@@ -2,13 +2,8 @@ from flask import Flask, request, render_template, redirect, url_for, flash
 import pandas as pd
 import os
 from datetime import datetime
-from pygyver.etl.dw import BigQueryExecutor
 import logging
-from google.cloud import storage
-
-os.environ['GOOGLE_APPLICATION_CREDENTIALS']="access_token.json"
-os.environ['BIGQUERY_PROJECT']="madecom-dev-tommy-watts"
-os.environ['PROJECT_ROOT']="/Users/tommy.watts/repos/cloud_apps/apps/refunds_data/"
+from google.cloud import storage, bigquery
 
 logging.getLogger().setLevel(logging.INFO)
 
@@ -51,21 +46,33 @@ def move_blob(bucket_name, source_file_name, destination_blob_name):
     new_blob = bucket.rename_blob(blob, destination_blob_name)
     logging.info("Blob {} has been renamed to {}".format(blob.name, new_blob.name))
 
-def blob_to_bq(gcs_bucket, gcs_path, dataset_id, table_id):
-    bq = BigQueryExecutor()
-    bq.load_gcs(
-        dataset_id = dataset_id, 
-        table_id = table_id, 
-        gcs_path = gcs_path,
-        schema_path = 'schema/refunds_schema.json',
-        gcs_bucket = gcs_bucket
+def blob_to_bq(bucket, filename, table_id):
+    
+    client = bigquery.Client()
+    job_config = bigquery.LoadJobConfig(
+        schema=[
+            bigquery.SchemaField("provider", "STRING"),
+            bigquery.SchemaField("order_id", "STRING"),
+            bigquery.SchemaField("date", "DATE"),
+            bigquery.SchemaField("amount", "FLOAT"),
+            bigquery.SchemaField("country", "STRING"),
+        ],
+        skip_leading_rows=1,
+        source_format=bigquery.SourceFormat.CSV,
     )
-    logging.info("File {} written to {}.{}".format(gcs_path, dataset_id, table_id))
+    
+    uri = f"gs://{bucket}/{filename}"
+
+    load_job = client.load_table_from_uri(
+        uri, table_id, job_config=job_config
+    )  
+
+    load_job.result()
+    logging.info("File {} written to {}".format(uri, table_id))
 
 def last_month():
     now = datetime.now()
     return f"{now.year}{now.month-1 if now.month else 12}"
-
 
 @app.route('/')
 @app.route('/upload')
@@ -85,7 +92,7 @@ def preview():
                     df = parse_refunds_data(uploaded_file)
             except Exception as e:
                 logging.info(e)
-            upload_gcs('madecom-dev-tommy-watts-sandbox', df.to_csv(index=False), f"tmp/refund_payments_{month}.csv")
+            upload_gcs(os.environ['BUCKET'], df.to_csv(index=False), f"tmp/refund_payments_{month}.csv")
             return render_template('preview.html', table=df.head().to_html(classes='data'), filename=filename)
         elif filename:
             return redirect(url_for('sent', filename=filename))
@@ -93,10 +100,10 @@ def preview():
 @app.route('/sent', methods=['GET', 'POST'])
 def sent():
     try:
-        month = last_month()
-        filename = f"refund_payments_{month}.csv"
-        move_blob('madecom-dev-tommy-watts-sandbox', f'tmp/{filename}', filename)
-        blob_to_bq('madecom-dev-tommy-watts-sandbox', filename, 'archive', os.path.splitext(filename)[0])
+        filename = f"refund_payments_{last_month()}.csv"
+        move_blob(os.environ['BUCKET'], f'tmp/{filename}', filename)
+        table_id = f"{os.environ['BIGQUERY_PROJECT']}.archive.{os.path.splitext(filename)[0]}"
+        blob_to_bq(os.environ['BUCKET'], filename, table_id)
     except Exception as e:
                 print(e)
     return render_template('sent.html')

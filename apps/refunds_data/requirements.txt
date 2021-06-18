@@ -8,4 +8,3 @@ google-auth
 google-cloud-core
 google-cloud-storage
 pandas
-pygyver
