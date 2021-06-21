@@ -12,7 +12,6 @@ RUN pip install -r /app/requirements.txt
 
 EXPOSE 8080
 
-SHELL ["/bin/bash", “-c”]
-CMD ["source", "envs.sh"]
+# ENTRYPOINT ["bash", "-c", "source /app/envs.sh"]
 
 CMD ["python", "main.py"]

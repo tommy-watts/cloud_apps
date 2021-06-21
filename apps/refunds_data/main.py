@@ -84,7 +84,6 @@ def preview():
     if request.method == 'POST':
         uploaded_file = request.files.get('file')
         filename = request.form.get('filename')
-        month = last_month()
         if uploaded_file:
             filename = uploaded_file.filename
             try:
@@ -92,7 +91,7 @@ def preview():
                     df = parse_refunds_data(uploaded_file)
             except Exception as e:
                 logging.info(e)
-            upload_gcs(os.environ['BUCKET'], df.to_csv(index=False), f"tmp/refund_payments_{month}.csv")
+            upload_gcs(os.environ['BUCKET'], df.to_csv(index=False), f"tmp/refund_payments_{last_month()}.csv")
             return render_template('preview.html', table=df.head().to_html(classes='data'), filename=filename)
         elif filename:
             return redirect(url_for('sent', filename=filename))
