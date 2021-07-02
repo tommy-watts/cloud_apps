@@ -1,4 +1,4 @@
-from flask import Flask, request, render_template, redirect, url_for
+from flask import Flask, request, render_template, redirect, url_for, jsonify
 import pandas as pd
 import os
 from datetime import datetime
@@ -9,18 +9,73 @@ logging.getLogger().setLevel(logging.INFO)
 
 app = Flask(__name__)
 
+FIELDS = {
+        'countries' : [
+            'CHF',
+            'FR',
+            'DE',
+            'NL',
+            'ES',
+            'UK'
+    ],
+        'provider' : [
+            'paypal',
+            'be2bill',
+            'stripe',
+            'klarna ',
+            'bacs'
+    ]
+}
+
+class InvalidUsage(Exception):
+    status_code = 400
+
+    def __init__(self, message, status_code=None, payload=None):
+        Exception.__init__(self)
+        self.message = message
+        if status_code is not None:
+            self.status_code = status_code
+        self.payload = payload
+
+    def to_dict(self):
+        rv = dict(self.payload or ())
+        rv['message'] = self.message
+        return rv
+
+def get_last_month():
+    now = datetime.now()
+    return f"{now.year}{('0' + str(now.month-1)) if now.month else '12'}"
+
+def check_last_month(dates):
+    last_month = int(get_last_month()[4:])
+    return (dates.dt.month == last_month).all()
+
+def check_field(field):
+    return [i for i in field if i not in FIELDS[field.name]]
+
 def parse_refunds_data(path): 
-    df = pd.concat(pd.read_excel(path, sheet_name=None)).\
-                        reset_index().drop(['level_1'], axis=1).\
-                        rename(columns={"level_0": "provider"})
-    df.amount = df.amount * 100
-    df.date = pd.to_datetime(df.date, format='%Y%m%d')
-    df.provider = df.provider.str.lower()
-    if any(df.date.isna()):
-        raise Exception("There are null dates in the data provided.")
-    if not all([item in df.columns for item in ['order_id', 'provider', 'date', 'amount', 'country']]):
-        raise Exception("Expected fields order_id, provider, date, amount, country.")
-    return df
+    try:
+        df = pd.concat(pd.read_excel(path, sheet_name=None)).\
+                            reset_index().drop(['level_1'], axis=1).\
+                            rename(columns={"level_0": "provider"})
+        if not all([item in df.columns for item in ['order_id', 'provider', 'date', 'amount', 'country']]):
+            raise InvalidUsage("Expected fields order_id, provider, date, amount, country are not present.")
+        df.date = pd.to_datetime(df.date, format='%Y%m%d')
+        if not check_last_month(df.date):
+            raise InvalidUsage("Data needs to contain refunds only for last month.")
+        if any(df.date.isna()):
+            raise InvalidUsage("There are null dates in the data provided.")
+        df.amount = df.amount * 100
+        df.provider = df.provider.str.lower()
+        df.country = df.country.str.lower()
+        for field in [df.provider, df.country]:
+            unknown_values = check_field(field)
+            if unknown_values:
+                raise InvalidUsage(f"There are unknown {field.name} ({unknown_values}) in the data provided.")
+        return df
+    except InvalidUsage as e:
+        logging.error(e)
+        raise e
 
 
 def upload_gcs(bucket_name, uploaded_file, destination_blob_name):
@@ -70,9 +125,6 @@ def blob_to_bq(bucket, filename, table_id):
     load_job.result()
     logging.info("File {} written to {}".format(uri, table_id))
 
-def last_month():
-    now = datetime.now()
-    return f"{now.year}{now.month-1 if now.month else 12}"
 
 @app.route('/')
 @app.route('/upload')
@@ -86,12 +138,10 @@ def preview():
         filename = request.form.get('filename')
         if uploaded_file:
             filename = uploaded_file.filename
-            try:
-                if 'xls' in filename:
-                    df = parse_refunds_data(uploaded_file)
-            except Exception as e:
-                logging.info(e)
-            upload_gcs(os.environ['BUCKET'], df.to_csv(index=False), f"tmp/refund_payments_{last_month()}.csv")
+            if not '.xls' in filename:
+                raise InvalidUsage('Uploaded file is not of type .xlsx or .xls', 400)
+            df = parse_refunds_data(uploaded_file)
+            upload_gcs(os.environ['BUCKET'], df.to_csv(index=False), f"tmp/refund_payments_{get_last_month()}.csv")
             return render_template('preview.html', table=df.head().to_html(classes='data'), filename=filename)
         elif filename:
             return redirect(url_for('sent', filename=filename))
@@ -99,12 +149,12 @@ def preview():
 @app.route('/sent', methods=['GET', 'POST'])
 def sent():
     try:
-        filename = f"refund_payments_{last_month()}.csv"
+        filename = f"refund_payments_{get_last_month()}.csv"
         move_blob(os.environ['BUCKET'], f'tmp/{filename}', filename)
         table_id = f"{os.environ['BIGQUERY_PROJECT']}.archive.{os.path.splitext(filename)[0]}"
         blob_to_bq(os.environ['BUCKET'], filename, table_id)
-    except Exception as e:
-                print(e)
+    except InvalidUsage as e:
+        print(e)
     return render_template('sent.html')
 
 @app.route('/cancel', methods=['GET', 'POST'])
@@ -112,13 +162,11 @@ def cancel():
     delete_tmp('madecom-dev-tommy-watts-sandbox', 'tmp/')
     return render_template('index.html')
 
-@app.errorhandler(500)
-def server_error(e):
-    logging.exception('An error occurred during a request.')
-    return """
-    An internal error occurred: <pre>{}</pre>
-    See logs for full stacktrace.
-    """.format(e), 500
+@app.errorhandler(InvalidUsage)
+def handle_invalid_usage(error):
+    response = jsonify(error.to_dict())
+    response.status_code = error.status_code
+    return response
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080, debug=True)

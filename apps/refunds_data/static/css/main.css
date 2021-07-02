@@ -44,11 +44,21 @@ body{
     flex-direction: column;
     text-align: center;
 }
+
+.text-area{
+    width:50%;
+    display:flex;
+    flex-direction: column;
+    text-align: left;
+}
+
 .upload-form{
     border: solid 1px lightgrey;
     border-radius: 20px;
     padding:10px 20px 10px 20px;
 }
+
+
 table{
     width:100%;
     text-align: left;

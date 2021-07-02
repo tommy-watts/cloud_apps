@@ -11,6 +11,24 @@
       <div class="container-inner">
         <div class="upload-form">
           <h1>Upload your Refunds data file</h1>
+          <div class="text-area">
+            <p>
+              To upload your refunds payment providers data, select a file below and click preview to
+              view your data. The file must:
+              <ul>
+                <li>Contain data for the previous month to today.</li>
+                <li>Be in xls or xlsx format.</li>
+                <li>Have one sheet per provider.</li>
+                <li>Contain the following columns: order_id, date, amount, country</li>
+                <ul>
+                  <li>order_id - The identifier of the order.</li>
+                  <li>date - The date of the order.</li>
+                  <li>amount - The refund amount.</li>
+                  <li>country - The store code.</li>
+                </ul>
+              </ul>
+            </p>
+          </div>
           <form method="POST" action="preview" enctype="multipart/form-data">
             <p><input type="file" name="file"></p>
             <p class="form-input"><input type="submit" value="Preview" class="button button-submit"></p>
