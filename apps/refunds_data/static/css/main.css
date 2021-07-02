@@ -46,7 +46,8 @@ body{
 }
 
 .text-area{
-    width:50%;
+    margin: auto;
+    width: 70%;
     display:flex;
     flex-direction: column;
     text-align: left;

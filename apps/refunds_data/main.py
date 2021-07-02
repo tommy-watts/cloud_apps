@@ -10,7 +10,7 @@ logging.getLogger().setLevel(logging.INFO)
 app = Flask(__name__)
 
 FIELDS = {
-        'countries' : [
+        'country' : [
             'CHF',
             'FR',
             'DE',
@@ -67,11 +67,10 @@ def parse_refunds_data(path):
             raise InvalidUsage("There are null dates in the data provided.")
         df.amount = df.amount * 100
         df.provider = df.provider.str.lower()
-        df.country = df.country.str.lower()
         for field in [df.provider, df.country]:
             unknown_values = check_field(field)
             if unknown_values:
-                raise InvalidUsage(f"There are unknown {field.name} ({unknown_values}) in the data provided.")
+                raise InvalidUsage(f"There are unknown {field.name} {set(unknown_values)} in the data provided.")
         return df
     except InvalidUsage as e:
         logging.error(e)
